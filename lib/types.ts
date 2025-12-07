@@ -40,3 +40,6 @@ export interface Profile {
   username: string
   created_at: string
 }
+
+export class CatalogCourse {
+}
