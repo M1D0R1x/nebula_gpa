@@ -69,7 +69,6 @@ export function CourseDialog({
         [customCatalog],
     )
 
-    // Reset dialog state
     useEffect(() => {
         if (open) {
             if (defaultValues) {
@@ -77,25 +76,23 @@ export function CourseDialog({
                 setCode(defaultValues.code ?? "")
                 setCredits(defaultValues.credits?.toString() ?? "")
                 setGrade(defaultValues.grade ?? "O")
-                setSelectedCatalogCourse(null)
             } else {
                 setName("")
                 setCode("")
                 setCredits("")
                 setGrade("O")
-                setSelectedCatalogCourse(null)
             }
 
             setSearchTerm("")
             setSuggestions([])
             setShowSuggestions(false)
             setHighlightedIndex(-1)
+            setSelectedCatalogCourse(null)
             setIsOverridden(false)
             setError(null)
         }
     }, [open, defaultValues])
 
-    // AUTOCOMPLETE LOGIC
     const handleNameInput = (value: string) => {
         setName(value)
         setSearchTerm(value)
@@ -153,7 +150,6 @@ export function CourseDialog({
         }
     }
 
-    // SUBMIT
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError(null)
@@ -196,8 +192,8 @@ export function CourseDialog({
                 <form onSubmit={handleSubmit}>
                     <div className="grid gap-4 py-4">
 
-                        {/* COURSE NAME (Autocomplete) */}
-                        <div className="relative">
+                        {/* AUTOCOMPLETE INPUT */}
+                        <div className="relative grid gap-2">
                             <Label>Course Name</Label>
                             <Input
                                 ref={nameInputRef}
@@ -226,13 +222,15 @@ export function CourseDialog({
 
                                                 <div className="flex-1">
                                                     <div className="flex gap-2 items-center">
-                                                        <Badge variant="outline" className="font-mono text-xs">{course.code}</Badge>
+                                                        <Badge variant="outline" className="font-mono text-xs">
+                                                            {course.code}
+                                                        </Badge>
                                                         <span className="font-medium">{course.name}</span>
                                                     </div>
 
                                                     <span className="text-xs text-muted-foreground">
-                            {course.credits} credits
-                          </span>
+                                                        {course.credits} credits
+                                                    </span>
                                                 </div>
                                             </li>
                                         ))}
