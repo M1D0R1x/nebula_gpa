@@ -1,6 +1,6 @@
 "use client"
 
-import { GraduationCap, LayoutDashboard, Calculator, LogOut, User } from "lucide-react"
+import { GraduationCap, LayoutDashboard, Calculator, LogOut, User, BarChart3 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -32,6 +32,7 @@ export function AppSidebar({ username }: AppSidebarProps) {
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/predictor", label: "CGPA Predictor", icon: Calculator },
+    { href: "/graphs", label: "Graphs", icon: BarChart3 },
   ]
 
   return (
@@ -39,7 +40,7 @@ export function AppSidebar({ username }: AppSidebarProps) {
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <Link href="/dashboard" className="flex items-center gap-2 text-sidebar-foreground">
           <GraduationCap className="h-6 w-6 text-sidebar-primary" />
-          <span className="text-lg font-bold">nebula_gpa</span>
+          <span className="text-lg font-bold">Nebula GPA</span>
         </Link>
       </SidebarHeader>
       <SidebarContent className="p-2">
