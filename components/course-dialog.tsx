@@ -9,6 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,6 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, BookOpen } from "lucide-react"
 
@@ -51,7 +53,6 @@ export function CourseDialog({
     const [credits, setCredits] = useState("")
     const [grade, setGrade] = useState<Grade>("O")
 
-    const [searchTerm, setSearchTerm] = useState("")
     const [suggestions, setSuggestions] = useState<CatalogItem[]>([])
     const [showSuggestions, setShowSuggestions] = useState(false)
     const [highlightedIndex, setHighlightedIndex] = useState(-1)
@@ -83,7 +84,6 @@ export function CourseDialog({
                 setGrade("O")
             }
 
-            setSearchTerm("")
             setSuggestions([])
             setShowSuggestions(false)
             setHighlightedIndex(-1)
@@ -95,7 +95,6 @@ export function CourseDialog({
 
     const handleNameInput = (value: string) => {
         setName(value)
-        setSearchTerm(value)
 
         if (selectedCatalogCourse && value !== selectedCatalogCourse.name) {
             setIsOverridden(true)
@@ -118,7 +117,6 @@ export function CourseDialog({
         setCode(course.code)
         setCredits(course.credits.toString())
 
-        setSearchTerm("")
         setSuggestions([])
         setShowSuggestions(false)
         setIsOverridden(false)
@@ -145,9 +143,7 @@ export function CourseDialog({
             }
         }
 
-        if (e.key === "Escape") {
-            setShowSuggestions(false)
-        }
+        if (e.key === "Escape") setShowSuggestions(false)
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -169,7 +165,7 @@ export function CourseDialog({
         try {
             await onSubmit({
                 name: name.trim(),
-                code: code.trim(),
+                code: code.trim() || null,
                 credits: creditsNum,
                 grade,
             })
@@ -193,8 +189,9 @@ export function CourseDialog({
                     <div className="grid gap-4 py-4">
 
                         {/* AUTOCOMPLETE INPUT */}
-                        <div className="relative grid gap-2">
+                        <div className="relative w-full">
                             <Label>Course Name</Label>
+
                             <Input
                                 ref={nameInputRef}
                                 value={name}
@@ -204,13 +201,16 @@ export function CourseDialog({
                             />
 
                             {showSuggestions && (
-                                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg">
-                                    <ul ref={listRef} className="max-h-64 overflow-auto">
+                                <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-md border bg-popover shadow-lg">
+                                    <ul
+                                        ref={listRef}
+                                        className="max-h-64 overflow-auto p-1 bg-popover rounded-md"
+                                    >
                                         {suggestions.map((course, index) => (
                                             <li
                                                 key={course.code}
                                                 className={cn(
-                                                    "flex items-center gap-2 px-3 py-2 cursor-pointer",
+                                                    "flex items-center gap-2 px-3 py-2 cursor-pointer rounded-md",
                                                     highlightedIndex === index
                                                         ? "bg-accent border-l-2 border-l-primary"
                                                         : "hover:bg-accent",
@@ -227,10 +227,9 @@ export function CourseDialog({
                                                         </Badge>
                                                         <span className="font-medium">{course.name}</span>
                                                     </div>
-
                                                     <span className="text-xs text-muted-foreground">
-                                                        {course.credits} credits
-                                                    </span>
+                            {course.credits} credits
+                          </span>
                                                 </div>
                                             </li>
                                         ))}
