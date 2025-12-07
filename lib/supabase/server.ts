@@ -1,3 +1,4 @@
+// lib/supabase/server.ts
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -5,8 +6,8 @@ export async function createClient() {
     const cookieStore = await cookies();
 
     return createServerClient(
-        process.env.SUPABASE_URL!,              // FIXED
-        process.env.SUPABASE_SERVICE_ROLE_KEY!, // FIXED
+        process.env.SUPABASE_URL!,               // FIXED
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,  // FIXED (use only if you need privileged DB ops)
         {
             cookies: {
                 getAll() {
@@ -18,7 +19,7 @@ export async function createClient() {
                             cookieStore.set(name, value, options)
                         );
                     } catch {
-                        // Ignore when running in RSC — safe fallback
+                        // Running in a static server context → safe to ignore
                     }
                 },
             },
