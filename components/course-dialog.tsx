@@ -188,17 +188,18 @@ export function CourseDialog({
                 <form onSubmit={handleSubmit}>
                     <div className="grid gap-4 py-4">
 
-                        {/* AUTOCOMPLETE INPUT */}
+                        {/* COURSE NAME – FIXED */}
                         <div className="relative w-full">
-                            <Label>Course Name</Label>
-
-                            <Input
-                                ref={nameInputRef}
-                                value={name}
-                                onChange={(e) => handleNameInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Type name or code..."
-                            />
+                            <div className="grid gap-2">
+                                <Label>Course Name</Label>
+                                <Input
+                                    ref={nameInputRef}
+                                    value={name}
+                                    onChange={(e) => handleNameInput(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Type name or code..."
+                                />
+                            </div>
 
                             {showSuggestions && (
                                 <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-md border bg-popover shadow-lg">
@@ -228,8 +229,8 @@ export function CourseDialog({
                                                         <span className="font-medium">{course.name}</span>
                                                     </div>
                                                     <span className="text-xs text-muted-foreground">
-                            {course.credits} credits
-                          </span>
+                                                        {course.credits} credits
+                                                    </span>
                                                 </div>
                                             </li>
                                         ))}
