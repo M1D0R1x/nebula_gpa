@@ -48,8 +48,9 @@ export interface Profile {
  */
 export interface CatalogCourse {
     id?: string
-    user_id?: string
+    user_id?: string | null
     code: string
     name: string
     credits: number
+    created_at?: string
 }

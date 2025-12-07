@@ -1,10 +1,6 @@
-// Course catalog data for auto-fill functionality
 import type { CatalogCourse } from "./types"
 
-// Static catalog entries (no DB fields)
-export type CatalogItem = Omit<CatalogCourse, "id" | "user_id">
-
-export const DEFAULT_COURSE_CATALOG: CatalogItem[] = [
+export const DEFAULT_COURSE_CATALOG: Omit<CatalogCourse, "id" | "user_id" | "created_at">[] = [
     { code: "CHE110", name: "Environmental Studies", credits: 4 },
     { code: "CSE111", name: "Orientation to Computing-I", credits: 2 },
     { code: "CSE326", name: "Internet Programming Laboratory", credits: 2 },
@@ -52,42 +48,20 @@ export const DEFAULT_COURSE_CATALOG: CatalogItem[] = [
     { code: "PES319", name: "Soft Skills-II", credits: 3 },
 ]
 
-// Fuzzy search function for course lookup
-export function searchCatalog(
-    query: string,
-    catalog: CatalogItem[],
-): CatalogItem[] {
+export function searchCatalog(query: string, catalog: CatalogCourse[]): CatalogCourse[] {
     if (!query.trim()) return []
 
-    const lowerQuery = query.toLowerCase().trim()
+    const q = query.toLowerCase()
 
-    const scored = catalog.map((course) => {
-        const lowerCode = course.code.toLowerCase()
-        const lowerName = course.name.toLowerCase()
-        let score = 0
+    const scored = catalog.map((c) => {
+        const score =
+            (c.code.toLowerCase() === q ? 100 : 0) +
+            (c.code.toLowerCase().startsWith(q) ? 80 : 0) +
+            (c.code.toLowerCase().includes(q) ? 40 : 0) +
+            (c.name.toLowerCase().startsWith(q) ? 60 : 0) +
+            (c.name.toLowerCase().includes(q) ? 30 : 0)
 
-        if (lowerCode === lowerQuery) score += 100
-        else if (lowerCode.startsWith(lowerQuery)) score += 80
-        else if (lowerCode.includes(lowerQuery)) score += 60
-
-        if (lowerName === lowerQuery) score += 90
-        else if (lowerName.startsWith(lowerQuery)) score += 70
-        else if (lowerName.includes(` ${lowerQuery}`)) score += 50
-        else if (lowerName.includes(lowerQuery)) score += 40
-
-        const queryWords = lowerQuery.split(/\s+/)
-        const nameWords = lowerName.split(/\s+/)
-
-        for (const qw of queryWords) {
-            if (qw.length >= 2) {
-                for (const nw of nameWords) {
-                    if (nw.startsWith(qw)) score += 20
-                    else if (nw.includes(qw)) score += 10
-                }
-            }
-        }
-
-        return { course, score }
+        return { score, course: c }
     })
 
     return scored
