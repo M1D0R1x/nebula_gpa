@@ -1,16 +1,9 @@
 // Course catalog data for auto-fill functionality
 import type { CatalogCourse } from "./types"
 
-// IMPORTANT:
-// We remove "id" and "user_id" from the type requirement,
-// because the catalog is STATIC and does not contain DB fields.
-export type CatalogItem = {
-    code: string
-    name: string
-    credits: number
-}
+// Static catalog entries (no DB fields)
+export type CatalogItem = Omit<CatalogCourse, "id" | "user_id">
 
-// Final course catalog (clean + corrected)
 export const DEFAULT_COURSE_CATALOG: CatalogItem[] = [
     { code: "CHE110", name: "Environmental Studies", credits: 4 },
     { code: "CSE111", name: "Orientation to Computing-I", credits: 2 },
@@ -59,7 +52,7 @@ export const DEFAULT_COURSE_CATALOG: CatalogItem[] = [
     { code: "PES319", name: "Soft Skills-II", credits: 3 },
 ]
 
-// Fixed fuzzy search logic
+// Fuzzy search function for course lookup
 export function searchCatalog(
     query: string,
     catalog: CatalogItem[],
@@ -73,17 +66,15 @@ export function searchCatalog(
         const lowerName = course.name.toLowerCase()
         let score = 0
 
-        // Code matching
         if (lowerCode === lowerQuery) score += 100
         else if (lowerCode.startsWith(lowerQuery)) score += 80
         else if (lowerCode.includes(lowerQuery)) score += 60
 
-        // Name matching (fixed partial match)
         if (lowerName === lowerQuery) score += 90
         else if (lowerName.startsWith(lowerQuery)) score += 70
+        else if (lowerName.includes(` ${lowerQuery}`)) score += 50
         else if (lowerName.includes(lowerQuery)) score += 40
 
-        // Word-based partial matching
         const queryWords = lowerQuery.split(/\s+/)
         const nameWords = lowerName.split(/\s+/)
 
