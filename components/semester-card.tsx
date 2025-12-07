@@ -11,6 +11,7 @@ import { GRADE_POINTS, type Semester, type Course } from "@/lib/types"
 import { CourseDialog } from "./course-dialog"
 import { DeleteConfirmDialog } from "./delete-confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { getGradeBgClass } from "@/lib/grade-utils"
 
 interface SemesterCardProps {
   semester: Semester
@@ -75,23 +76,29 @@ export function SemesterCard({
               </span>
             </div>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsAddingCourse(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Course
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsDeletingSemester(true)} className="text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Semester
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsAddingCourse(true)}>
+              <Plus className="mr-1 h-3 w-3" />
+              Add Course
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setIsAddingCourse(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Course
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsDeletingSemester(true)} className="text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Semester
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </CardHeader>
         <CardContent>
           {courses.length === 0 ? (
@@ -130,13 +137,11 @@ export function SemesterCard({
                           {course.code && <div className="text-xs text-muted-foreground">{course.code}</div>}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center">{course.credits}</TableCell>
+                      <TableCell className="text-center tabular-nums">{course.credits}</TableCell>
                       <TableCell className="text-center">
-                        <Badge variant={gradePoint === null ? "outline" : gradePoint >= 8 ? "default" : "secondary"}>
-                          {course.grade}
-                        </Badge>
+                        <Badge className={getGradeBgClass(course.grade)}>{course.grade}</Badge>
                       </TableCell>
-                      <TableCell className="text-center font-mono">{points}</TableCell>
+                      <TableCell className="text-center font-mono tabular-nums">{points}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button

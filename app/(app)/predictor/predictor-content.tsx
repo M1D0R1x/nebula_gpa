@@ -1,16 +1,19 @@
 "use client"
 
-import { useState, useCallback, useMemo, memo } from "react"
+import { useState, useCallback, useMemo, memo, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { RefreshCw, Save, Plus, AlertTriangle, Calculator, TrendingUp, BookOpen, Award } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { RefreshCw, Save, Plus, Calculator, TrendingUp, BookOpen, Award, Filter } from "lucide-react"
 import { formatGpa, computeSgpa, computeCgpa, getTotalCredits } from "@/lib/gpa"
 import type { Semester, Course, Grade } from "@/lib/types"
 import { PredictorSemesterCard } from "./predictor-semester-card"
 import { SemesterDialog } from "@/components/semester-dialog"
+import { ApplyChangesDialog } from "@/components/apply-changes-dialog"
 import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
 
 interface PredictorContentProps {
   officialSemesters: Semester[]
@@ -36,6 +39,9 @@ const StickyHeader = memo(function StickyHeader({
   officialSemesterCount,
   hasChanges,
   isSaving,
+  modifiedCoursesCount,
+  showOnlyModified,
+  onToggleShowModified,
   onReset,
   onApply,
   onAddSemester,
@@ -48,6 +54,9 @@ const StickyHeader = memo(function StickyHeader({
   officialSemesterCount: number
   hasChanges: boolean
   isSaving: boolean
+  modifiedCoursesCount: number
+  showOnlyModified: boolean
+  onToggleShowModified: (checked: boolean) => void
   onReset: () => void
   onApply: () => void
   onAddSemester: () => void
@@ -55,11 +64,13 @@ const StickyHeader = memo(function StickyHeader({
   const cgpaDiff = predictedCgpa !== null && officialCgpa !== null ? predictedCgpa - officialCgpa : null
 
   return (
-    <div className="sticky top-0 z-10 -mx-4 px-4 pb-4 pt-0 bg-background/95 backdrop-blur-sm border-b">
+    <div className="sticky top-0 z-20 bg-background border-b -mx-4 md:-mx-6 px-4 md:px-6 pb-4 pt-4">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">CGPA Predictor</h1>
-          <p className="text-muted-foreground">Simulate grade changes without affecting your official records</p>
+          <p className="text-muted-foreground text-sm">
+            Simulate grade changes without affecting your official records
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onReset} disabled={!hasChanges}>
@@ -74,13 +85,21 @@ const StickyHeader = memo(function StickyHeader({
       </div>
 
       {hasChanges && (
-        <Alert className="mb-4">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            You have unsaved predictions. Click &ldquo;Apply to Official&rdquo; to save changes to your record, or
-            &ldquo;Reset&rdquo; to discard.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-1 h-4 bg-blue-500 rounded-full" />
+            <span className="text-blue-700 dark:text-blue-300">
+              {modifiedCoursesCount} modified course{modifiedCoursesCount !== 1 ? "s" : ""} highlighted in blue
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch id="show-modified" checked={showOnlyModified} onCheckedChange={onToggleShowModified} />
+            <Label htmlFor="show-modified" className="text-sm cursor-pointer flex items-center gap-1">
+              <Filter className="h-3 w-3" />
+              Show only modified
+            </Label>
+          </div>
+        </div>
       )}
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -111,7 +130,7 @@ const StickyHeader = memo(function StickyHeader({
           </CardHeader>
           <CardContent>
             <div
-              className={`text-2xl font-bold tabular-nums transition-colors duration-100 ${cgpaDiff !== null && cgpaDiff > 0 ? "text-green-600" : cgpaDiff !== null && cgpaDiff < 0 ? "text-red-600" : ""}`}
+              className={`text-2xl font-bold tabular-nums ${cgpaDiff !== null && cgpaDiff > 0 ? "text-green-600" : cgpaDiff !== null && cgpaDiff < 0 ? "text-red-600" : ""}`}
             >
               {cgpaDiff !== null ? (cgpaDiff >= 0 ? "+" : "") + cgpaDiff.toFixed(2) : "N/A"}
             </div>
@@ -145,13 +164,73 @@ const StickyHeader = memo(function StickyHeader({
 
 export function PredictorContent({ officialSemesters, userId }: PredictorContentProps) {
   const router = useRouter()
+  const { toast } = useToast()
+  const officialSnapshot = useRef<Semester[]>(deepClone(officialSemesters))
   const [predictedSemesters, setPredictedSemesters] = useState<Semester[]>(() => deepClone(officialSemesters))
   const [isAddingSemester, setIsAddingSemester] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const [showApplyDialog, setShowApplyDialog] = useState(false)
+  const [showOnlyModified, setShowOnlyModified] = useState(false)
+
+  const originalCoursesMap = useMemo(() => {
+    const map = new Map<string, Course>()
+    for (const semester of officialSnapshot.current) {
+      for (const course of semester.courses || []) {
+        map.set(course.id, course)
+      }
+    }
+    return map
+  }, [])
+
+  const modifiedCourseIds = useMemo(() => {
+    const modified = new Set<string>()
+    for (const semester of predictedSemesters) {
+      for (const course of semester.courses || []) {
+        if (course.id.startsWith("temp_")) {
+          // New courses are always "modified"
+          modified.add(course.id)
+          continue
+        }
+        const original = originalCoursesMap.get(course.id)
+        if (!original) {
+          modified.add(course.id)
+          continue
+        }
+        // Check if any field differs
+        if (
+          original.grade !== course.grade ||
+          original.credits !== course.credits ||
+          original.name !== course.name ||
+          original.code !== course.code
+        ) {
+          modified.add(course.id)
+        }
+      }
+    }
+    return modified
+  }, [predictedSemesters, originalCoursesMap])
+
+  const affectedSemesterIds = useMemo(() => {
+    const affected = new Set<string>()
+    for (const semester of predictedSemesters) {
+      const isNewSemester = semester.id.startsWith("temp_")
+      if (isNewSemester) {
+        affected.add(semester.id)
+        continue
+      }
+      for (const course of semester.courses || []) {
+        if (modifiedCourseIds.has(course.id)) {
+          affected.add(semester.id)
+          break
+        }
+      }
+    }
+    return affected
+  }, [predictedSemesters, modifiedCourseIds])
 
   const stats = useMemo(() => {
-    const officialAllCourses = officialSemesters.flatMap((s) => s.courses || [])
+    const officialAllCourses = officialSnapshot.current.flatMap((s) => s.courses || [])
     const predictedAllCourses = predictedSemesters.flatMap((s) => s.courses || [])
 
     return {
@@ -160,7 +239,7 @@ export function PredictorContent({ officialSemesters, userId }: PredictorContent
       officialCredits: getTotalCredits(officialAllCourses),
       predictedCredits: getTotalCredits(predictedAllCourses),
     }
-  }, [officialSemesters, predictedSemesters])
+  }, [predictedSemesters])
 
   const nextIndex = useMemo(() => {
     if (predictedSemesters.length === 0) return 1
@@ -168,9 +247,10 @@ export function PredictorContent({ officialSemesters, userId }: PredictorContent
   }, [predictedSemesters])
 
   const handleReset = useCallback(() => {
-    setPredictedSemesters(deepClone(officialSemesters))
+    setPredictedSemesters(deepClone(officialSnapshot.current))
     setHasChanges(false)
-  }, [officialSemesters])
+    setShowOnlyModified(false)
+  }, [])
 
   const handleAddSemester = useCallback(
     async (data: { label: string; index: number }) => {
@@ -213,7 +293,11 @@ export function PredictorContent({ officialSemesters, userId }: PredictorContent
   )
 
   const handleEditCourse = useCallback(
-    (semesterId: string, courseId: string, updates: { grade?: Grade; credits?: number }) => {
+    (
+      semesterId: string,
+      courseId: string,
+      updates: { grade?: Grade; credits?: number; name?: string; code?: string },
+    ) => {
       setPredictedSemesters((prev) =>
         prev.map((s) =>
           s.id === semesterId
@@ -238,13 +322,18 @@ export function PredictorContent({ officialSemesters, userId }: PredictorContent
     setHasChanges(true)
   }, [])
 
+  const handleApplyClick = useCallback(() => {
+    setShowApplyDialog(true)
+  }, [])
+
   const handleApplyChanges = useCallback(async () => {
+    setShowApplyDialog(false)
     setIsSaving(true)
     const supabase = createClient()
 
     try {
-      const existingSemesterIds = new Set(officialSemesters.map((s) => s.id))
-      const existingCourseIds = new Set(officialSemesters.flatMap((s) => (s.courses || []).map((c) => c.id)))
+      const existingSemesterIds = new Set(officialSnapshot.current.map((s) => s.id))
+      const existingCourseIds = new Set(officialSnapshot.current.flatMap((s) => (s.courses || []).map((c) => c.id)))
       const predictedSemesterIds = new Set(predictedSemesters.map((s) => s.id))
 
       const semestersToDelete = [...existingSemesterIds].filter((id) => !predictedSemesterIds.has(id))
@@ -265,7 +354,7 @@ export function PredictorContent({ officialSemesters, userId }: PredictorContent
           if (error) throw error
           semesterId = data.id
         } else if (existingSemesterIds.has(semester.id)) {
-          const original = officialSemesters.find((s) => s.id === semester.id)
+          const original = officialSnapshot.current.find((s) => s.id === semester.id)
           if (original && (original.label !== semester.label || original.index !== semester.index)) {
             await supabase
               .from("semesters")
@@ -274,7 +363,7 @@ export function PredictorContent({ officialSemesters, userId }: PredictorContent
           }
         }
 
-        const originalSemester = officialSemesters.find((s) => s.id === semester.id)
+        const originalSemester = officialSnapshot.current.find((s) => s.id === semester.id)
         const originalCourseIds = new Set((originalSemester?.courses || []).map((c) => c.id))
         const predictedCourseIdsForSemester = new Set((semester.courses || []).map((c) => c.id))
 
@@ -316,53 +405,82 @@ export function PredictorContent({ officialSemesters, userId }: PredictorContent
         }
       }
 
+      officialSnapshot.current = deepClone(predictedSemesters)
+      toast({
+        title: "Official record updated",
+        description: "Dashboard and graphs now reflect your changes.",
+      })
       router.refresh()
       setHasChanges(false)
+      setShowOnlyModified(false)
     } catch (error) {
       console.error("Error applying changes:", error)
-      alert("Failed to apply changes. Please try again.")
+      toast({
+        title: "Failed to apply changes",
+        description: "Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsSaving(false)
     }
-  }, [officialSemesters, predictedSemesters, userId, router])
+  }, [predictedSemesters, userId, router, toast])
 
   const openAddSemester = useCallback(() => setIsAddingSemester(true), [])
 
+  const visibleSemesters = useMemo(() => {
+    if (!showOnlyModified) return predictedSemesters
+    return predictedSemesters.filter((semester) => {
+      if (semester.id.startsWith("temp_")) return true
+      return (semester.courses || []).some((c) => modifiedCourseIds.has(c.id))
+    })
+  }, [predictedSemesters, showOnlyModified, modifiedCourseIds])
+
   const semesterData = useMemo(() => {
-    return predictedSemesters.map((semester) => {
+    return visibleSemesters.map((semester) => {
       const isNew = semester.id.startsWith("temp_")
-      const originalSemester = officialSemesters.find((s) => s.id === semester.id)
+      const originalSemester = officialSnapshot.current.find((s) => s.id === semester.id)
       const originalSgpa = originalSemester ? computeSgpa(originalSemester.courses || []) : null
       const predictedSgpa = computeSgpa(semester.courses || [])
       return { semester, isNew, originalSgpa, predictedSgpa }
     })
-  }, [predictedSemesters, officialSemesters])
+  }, [visibleSemesters])
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col min-h-0">
       <StickyHeader
         officialCgpa={stats.officialCgpa}
         predictedCgpa={stats.predictedCgpa}
         officialCredits={stats.officialCredits}
         predictedCredits={stats.predictedCredits}
         semesterCount={predictedSemesters.length}
-        officialSemesterCount={officialSemesters.length}
+        officialSemesterCount={officialSnapshot.current.length}
         hasChanges={hasChanges}
         isSaving={isSaving}
+        modifiedCoursesCount={modifiedCourseIds.size}
+        showOnlyModified={showOnlyModified}
+        onToggleShowModified={setShowOnlyModified}
         onReset={handleReset}
-        onApply={handleApplyChanges}
+        onApply={handleApplyClick}
         onAddSemester={openAddSemester}
       />
 
-      <div className="space-y-4 pt-2">
-        {predictedSemesters.length === 0 ? (
+      <div className="space-y-4 pt-4 flex-1">
+        {visibleSemesters.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
-            <h3 className="text-lg font-semibold">No semesters to predict</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Add a semester to start predicting your CGPA</p>
-            <Button className="mt-4" onClick={openAddSemester}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Semester
-            </Button>
+            <h3 className="text-lg font-semibold">
+              {showOnlyModified ? "No modified courses" : "No semesters to predict"}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {showOnlyModified
+                ? "Toggle off the filter to see all semesters"
+                : "Add a semester to start predicting your CGPA"}
+            </p>
+            {!showOnlyModified && (
+              <Button className="mt-4" onClick={openAddSemester}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Semester
+              </Button>
+            )}
           </div>
         ) : (
           semesterData.map(({ semester, isNew, originalSgpa, predictedSgpa }) => (
@@ -372,6 +490,8 @@ export function PredictorContent({ officialSemesters, userId }: PredictorContent
               originalSgpa={originalSgpa}
               predictedSgpa={predictedSgpa}
               isNew={isNew}
+              modifiedCourseIds={modifiedCourseIds}
+              showOnlyModified={showOnlyModified}
               onAddCourse={(course) => handleAddCourse(semester.id, course)}
               onEditCourse={(courseId, updates) => handleEditCourse(semester.id, courseId, updates)}
               onDeleteCourse={(courseId) => handleDeleteCourse(semester.id, courseId)}
@@ -386,6 +506,14 @@ export function PredictorContent({ officialSemesters, userId }: PredictorContent
         onOpenChange={setIsAddingSemester}
         onSubmit={handleAddSemester}
         nextIndex={nextIndex}
+      />
+
+      <ApplyChangesDialog
+        open={showApplyDialog}
+        onOpenChange={setShowApplyDialog}
+        onConfirm={handleApplyChanges}
+        modifiedCoursesCount={modifiedCourseIds.size}
+        affectedSemestersCount={affectedSemesterIds.size}
       />
     </div>
   )

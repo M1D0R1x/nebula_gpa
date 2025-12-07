@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, memo } from "react"
+import { useState, useCallback, memo, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -12,13 +12,15 @@ import { GRADES, GRADE_POINTS, type Semester, type Course, type Grade } from "@/
 import { CourseDialog } from "@/components/course-dialog"
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { getGradeColorClass } from "@/lib/grade-utils"
+import { getGradeBgClass } from "@/lib/grade-utils"
 
 interface PredictorSemesterCardProps {
   semester: Semester
   originalSgpa: number | null
   predictedSgpa: number | null
   isNew: boolean
+  modifiedCourseIds: Set<string>
+  showOnlyModified: boolean
   onAddCourse: (course: Omit<Course, "id" | "semester_id" | "created_at">) => void
   onEditCourse: (courseId: string, updates: { grade?: Grade; credits?: number }) => void
   onDeleteCourse: (courseId: string) => void
@@ -27,10 +29,12 @@ interface PredictorSemesterCardProps {
 
 const CourseRow = memo(function CourseRow({
   course,
+  isModified,
   onEditGrade,
   onDelete,
 }: {
   course: Course
+  isModified: boolean
   onEditGrade: (grade: Grade) => void
   onDelete: () => void
 }) {
@@ -39,7 +43,7 @@ const CourseRow = memo(function CourseRow({
   const isNewCourse = course.id.startsWith("temp_")
 
   return (
-    <TableRow className={isNewCourse ? "bg-primary/5" : ""}>
+    <TableRow className={isModified ? "border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20" : ""}>
       <TableCell>
         <div className="flex items-center gap-2">
           <div>
@@ -51,22 +55,30 @@ const CourseRow = memo(function CourseRow({
               New
             </Badge>
           )}
+          {isModified && !isNewCourse && (
+            <Badge variant="outline" className="text-xs border-blue-500 text-blue-600 dark:text-blue-400">
+              Modified
+            </Badge>
+          )}
         </div>
       </TableCell>
       <TableCell className="text-center tabular-nums">{course.credits}</TableCell>
       <TableCell className="text-center">
         <Select value={course.grade} onValueChange={onEditGrade}>
-          <SelectTrigger className={`w-[90px] h-8 ${getGradeColorClass(course.grade)}`}>
+          <SelectTrigger className="w-[90px] h-8">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {GRADES.map((g) => (
               <SelectItem key={g} value={g}>
-                {g}
+                <span className={getGradeBgClass(g).split(" ")[1]}>{g}</span>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+      </TableCell>
+      <TableCell className="text-center">
+        <Badge className={getGradeBgClass(course.grade)}>{course.grade}</Badge>
       </TableCell>
       <TableCell className="text-center font-mono tabular-nums">{points}</TableCell>
       <TableCell>
@@ -83,6 +95,8 @@ export const PredictorSemesterCard = memo(function PredictorSemesterCard({
   originalSgpa,
   predictedSgpa,
   isNew,
+  modifiedCourseIds,
+  showOnlyModified,
   onAddCourse,
   onEditCourse,
   onDeleteCourse,
@@ -100,6 +114,11 @@ export const PredictorSemesterCard = memo(function PredictorSemesterCard({
       : predictedSgpa !== null
         ? predictedSgpa
         : null
+
+  const visibleCourses = useMemo(() => {
+    if (!showOnlyModified) return courses
+    return courses.filter((c) => modifiedCourseIds.has(c.id))
+  }, [courses, showOnlyModified, modifiedCourseIds])
 
   const handleAddCourse = useCallback(
     (data: Omit<Course, "id" | "semester_id" | "created_at">) => {
@@ -124,9 +143,14 @@ export const PredictorSemesterCard = memo(function PredictorSemesterCard({
   const openAddCourse = useCallback(() => setIsAddingCourse(true), [])
   const openDeleteSemester = useCallback(() => setIsDeletingSemester(true), [])
 
+  // Check if this semester has any modifications
+  const hasModifications = isNew || courses.some((c) => modifiedCourseIds.has(c.id))
+
   return (
     <>
-      <Card className={`${isNew ? "border-primary/50 bg-primary/5" : ""}`}>
+      <Card
+        className={`${isNew ? "border-primary/50 bg-primary/5" : hasModifications ? "border-blue-300 dark:border-blue-700" : ""}`}
+      >
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div className="flex items-center gap-2">
             <CardTitle className="text-lg">{semester.label}</CardTitle>
@@ -142,7 +166,7 @@ export const PredictorSemesterCard = memo(function PredictorSemesterCard({
               <span>
                 SGPA:{" "}
                 <span
-                  className={`font-semibold tabular-nums transition-colors duration-100 ${sgpaDiff !== null && sgpaDiff > 0 ? "text-green-600" : sgpaDiff !== null && sgpaDiff < 0 ? "text-red-600" : "text-foreground"}`}
+                  className={`font-semibold tabular-nums ${sgpaDiff !== null && sgpaDiff > 0 ? "text-green-600" : sgpaDiff !== null && sgpaDiff < 0 ? "text-red-600" : "text-foreground"}`}
                 >
                   {formatGpa(predictedSgpa)}
                 </span>
@@ -179,13 +203,17 @@ export const PredictorSemesterCard = memo(function PredictorSemesterCard({
           </div>
         </CardHeader>
         <CardContent>
-          {courses.length === 0 ? (
+          {visibleCourses.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <p className="text-sm text-muted-foreground">No courses added yet</p>
-              <Button variant="outline" size="sm" className="mt-2 bg-transparent" onClick={openAddCourse}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Course
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                {showOnlyModified ? "No modified courses in this semester" : "No courses added yet"}
+              </p>
+              {!showOnlyModified && (
+                <Button variant="outline" size="sm" className="mt-2 bg-transparent" onClick={openAddCourse}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Course
+                </Button>
+              )}
             </div>
           ) : (
             <Table>
@@ -193,16 +221,18 @@ export const PredictorSemesterCard = memo(function PredictorSemesterCard({
                 <TableRow>
                   <TableHead>Course</TableHead>
                   <TableHead className="text-center">Credits</TableHead>
-                  <TableHead className="text-center w-[120px]">Grade</TableHead>
+                  <TableHead className="text-center w-[120px]">Change Grade</TableHead>
+                  <TableHead className="text-center">Grade</TableHead>
                   <TableHead className="text-center">Points</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {courses.map((course) => (
+                {visibleCourses.map((course) => (
                   <CourseRow
                     key={course.id}
                     course={course}
+                    isModified={modifiedCourseIds.has(course.id)}
                     onEditGrade={(grade) => onEditCourse(course.id, { grade })}
                     onDelete={() => setDeletingCourse(course)}
                   />

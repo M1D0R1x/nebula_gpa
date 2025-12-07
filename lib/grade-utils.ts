@@ -1,7 +1,13 @@
 import type { Grade } from "./types"
 
-// Grade color utility functions
-export function getGradeColorClass(grade: Grade): string {
+export interface GradeStyle {
+  textClass: string
+  bgClass: string
+  chartColor: string
+  borderClass: string
+}
+
+export function getGradeStyle(grade: Grade): GradeStyle {
   switch (grade) {
     case "O":
     case "A+":
@@ -10,56 +16,51 @@ export function getGradeColorClass(grade: Grade): string {
     case "B":
     case "C":
     case "D":
-      return "text-green-600"
+      return {
+        textClass: "text-green-600 dark:text-green-500",
+        bgClass: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+        chartColor: "#22c55e",
+        borderClass: "border-green-500",
+      }
     case "E":
     case "F":
     case "R":
-      return "text-red-600"
+      return {
+        textClass: "text-red-600 dark:text-red-500",
+        bgClass: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+        chartColor: "#ef4444",
+        borderClass: "border-red-500",
+      }
     case "I":
-      return "text-muted-foreground"
+      return {
+        textClass: "text-gray-500 dark:text-gray-400",
+        bgClass: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+        chartColor: "#9ca3af",
+        borderClass: "border-gray-400",
+      }
     default:
-      return ""
+      return {
+        textClass: "text-gray-600",
+        bgClass: "bg-gray-100 text-gray-600",
+        chartColor: "#6b7280",
+        borderClass: "border-gray-400",
+      }
   }
+}
+
+// Convenience helpers that use the unified getGradeStyle
+export function getGradeColorClass(grade: Grade): string {
+  return getGradeStyle(grade).textClass
 }
 
 export function getGradeBgClass(grade: Grade): string {
-  switch (grade) {
-    case "O":
-    case "A+":
-    case "A":
-    case "B+":
-    case "B":
-    case "C":
-    case "D":
-      return "bg-green-100 text-green-800"
-    case "E":
-    case "F":
-    case "R":
-      return "bg-red-100 text-red-800"
-    case "I":
-      return "bg-gray-100 text-gray-600"
-    default:
-      return ""
-  }
+  return getGradeStyle(grade).bgClass
 }
 
 export function getGradeChartColor(grade: Grade): string {
-  switch (grade) {
-    case "O":
-    case "A+":
-    case "A":
-    case "B+":
-    case "B":
-    case "C":
-    case "D":
-      return "#22c55e" // green-500
-    case "E":
-    case "F":
-    case "R":
-      return "#ef4444" // red-500
-    case "I":
-      return "#9ca3af" // gray-400
-    default:
-      return "#6b7280"
-  }
+  return getGradeStyle(grade).chartColor
+}
+
+export function getGradeBorderClass(grade: Grade): string {
+  return getGradeStyle(grade).borderClass
 }
