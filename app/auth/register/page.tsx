@@ -65,7 +65,7 @@ export default function RegisterPage() {
         <div className="flex flex-col gap-6">
           <div className="flex items-center justify-center gap-2 text-primary">
             <GraduationCap className="h-8 w-8" />
-            <span className="text-2xl font-bold">nebula_gpa</span>
+            <span className="text-2xl font-bold">Nebula GPA</span>
           </div>
           <Card>
             <CardHeader>
