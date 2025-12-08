@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Award } from "lucide-react"
+import { CalendarCheck } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -34,7 +35,8 @@ export function AppSidebar({ username }: AppSidebarProps) {
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/predictor", label: "CGPA Predictor", icon: Calculator },
     { href: "/graphs", label: "Graphs", icon: BarChart3 },
-      {href: "/grades", label: "Grades", icon: Award}
+    {href: "/grades", label: "Grades", icon: Award},
+    { href: "/attendance", label: "Attendance", icon: CalendarCheck },
   ]
 
   return (
